@@ -1,5 +1,8 @@
 use core::fmt;
-use std::fmt::{Display, Formatter};
+use std::{
+	fmt::{Display, Formatter},
+	ops::Range,
+};
 
 use line_index::LineIndex;
 use owo_colors::{colors::White, OwoColorize};
@@ -23,10 +26,19 @@ where T: ToTokenName
 	}
 }
 
+struct RangeWrapper(Range<usize>);
+
+impl Display for RangeWrapper {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
+
 #[derive(Tabled)]
 struct HighlightTable<T>
 where T: ToTokenName {
 	token: ToTokenNameWrapper<T>,
+	range: RangeWrapper,
 	span: String,
 }
 
@@ -75,6 +87,7 @@ where T: ToTokenName
 
 		self.table.push(HighlightTable {
 			token: ToTokenNameWrapper(token),
+			range: RangeWrapper(start..end),
 			span: format!(
 				"{}{}{}",
 				&self.source[lines.start..start]
