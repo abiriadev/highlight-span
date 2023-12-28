@@ -7,3 +7,5 @@
 $ git clone https://github.com/abiriadev/highlight-span && cd highlight-span
 $ cargo run --example lex-minilang ./examples/hello.minilang | cargo run ./examples/hello.minilang
 ```
+
+![](./demo.png)
