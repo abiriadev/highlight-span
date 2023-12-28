@@ -1,0 +1,8 @@
+/* simple if-else stmt */
+
+if (x < 10) { // the condition
+	do_something()
+} else {
+	// run only if the condition doesn't meet
+	print("this is else!\n")
+}
