@@ -4,8 +4,8 @@ use crate::SpanLike;
 
 #[derive(Debug)]
 pub struct LineBoundary {
-	bytes: Range<usize>,
-	indics: Range<usize>,
+	pub bytes: Range<usize>,
+	pub indics: Range<usize>,
 }
 
 impl LineBoundary {
@@ -71,6 +71,12 @@ impl LineIndex {
 	}
 
 	pub fn resolve_span<T: SpanLike>(&self, span: T) -> Range<usize> {
+		let (a, b) = self.resolve_boundary(span);
+
+		a.bytes.start..b.bytes.end
+	}
+
+	pub fn resolve_boundary<T: SpanLike>(&self, span: T) -> (&LineBoundary, &LineBoundary) {
 		let a = self
 			.0
 			.get(
@@ -89,7 +95,7 @@ impl LineIndex {
 			)
 			.unwrap();
 
-		a.bytes.start..b.bytes.end
+		(&a, &b)
 	}
 }
 
@@ -120,8 +126,6 @@ mod tests {
 		let src = "abc\ndef\nghi";
 		//         012 3456 7890
 		let index = LineIndex::init_lf(src, false);
-
-		println!("{:#?}", index);
 
 		assert_eq!(index.0[0].bytes, 0..3);
 		assert_eq!(&src[index.0[0].bytes.clone()], "abc");
@@ -233,6 +237,21 @@ mod tests {
 		assert_eq!(index.resolve_span(4..8), 10..22);
 		assert_eq!(index.resolve_span(2..11), 0..32);
 		assert_eq!(index.resolve_span(10..12), 23..32);
+	}
+
+	#[test]
+	fn resolve_span_containing_unicode_characters2() {
+		let src = "제 1조. [[대한민국]]은 [[민주주의|민주]][[공화국]]이며";
+		//         01234 56789 ０１２３４
+		let index = LineIndex::init_lf(src, true);
+
+		assert_eq!(index.resolve_span(0..12), 0..72);
+		assert_eq!(index.resolve_span(12..14), 0..72);
+		assert_eq!(index.resolve_span(14..25), 0..72);
+		assert_eq!(index.resolve_span(25..27), 0..72);
+		assert_eq!(index.resolve_span(27..29), 0..72);
+		assert_eq!(index.resolve_span(29..31), 0..72);
+		assert_eq!(index.resolve_span(32..34), 0..72);
 	}
 
 	#[test]
