@@ -2,7 +2,20 @@ use std::ops::Range;
 
 use crate::SpanLike;
 
-pub struct LineIndex(Vec<Range<usize>>);
+#[derive(Debug)]
+pub struct LineBoundary {
+	bytes: Range<usize>,
+	indics: Range<usize>,
+}
+
+impl LineBoundary {
+	fn new(bytes: Range<usize>, indics: Range<usize>) -> Self {
+		Self { bytes, indics }
+	}
+}
+
+#[derive(Debug)]
+pub struct LineIndex(Vec<LineBoundary>);
 
 impl LineIndex {
 	const CRLF: &'static str = "\r\n";
@@ -21,29 +34,30 @@ impl LineIndex {
 
 		let mut line_boundaries = source
 			.match_indices(line_feed)
-			.map(|(n, _)| {
-				let line_start = if is_bytes { start_byte } else { start_index };
-
-				let line_end = if is_bytes {
-					n
+			.map(|(end_byte, _)| {
+				let end_index = if is_bytes {
+					end_byte
 				} else {
-					line_start + source[start_byte..n].chars().count()
+					start_index + source[start_byte..end_byte].chars().count()
 				};
 
-				start_byte = n + line_feed_bytes;
-				start_index = line_end + line_feed_len;
+				let boundary = LineBoundary::new(start_byte..end_byte, start_index..end_index);
 
-				line_start..line_end
+				start_byte = end_byte + line_feed_bytes;
+				start_index = end_index + line_feed_len;
+
+				boundary
 			})
 			.collect::<Vec<_>>();
 
-		line_boundaries.push(
+		line_boundaries.push(LineBoundary::new(
+			start_byte..source.len(),
 			start_index..if is_bytes {
 				source.len()
 			} else {
 				start_index + source[start_byte..source.len()].chars().count()
 			},
-		);
+		));
 
 		Self(line_boundaries)
 	}
@@ -61,7 +75,7 @@ impl LineIndex {
 			.0
 			.get(
 				self.0
-					.binary_search_by_key(&span.start(), |l| l.start)
+					.binary_search_by_key(&span.start(), |l| l.indics.start)
 					.unwrap_or_else(|e| e - 1),
 			)
 			.unwrap();
@@ -70,12 +84,12 @@ impl LineIndex {
 			.0
 			.get(
 				self.0
-					.binary_search_by_key(&span.end(), |l| l.end)
+					.binary_search_by_key(&span.end(), |l| l.indics.end)
 					.unwrap_or_else(|e| e),
 			)
 			.unwrap();
 
-		a.start..b.end
+		a.bytes.start..b.bytes.end
 	}
 }
 
@@ -107,12 +121,14 @@ mod tests {
 		//         012 3456 7890
 		let index = LineIndex::init_lf(src, false);
 
-		assert_eq!(index.0[0], 0..3);
-		assert_eq!(&src[index.0[0].clone()], "abc");
-		assert_eq!(index.0[1], 4..7);
-		assert_eq!(&src[index.0[1].clone()], "def");
-		assert_eq!(index.0[2], 8..11);
-		assert_eq!(&src[index.0[2].clone()], "ghi");
+		println!("{:#?}", index);
+
+		assert_eq!(index.0[0].bytes, 0..3);
+		assert_eq!(&src[index.0[0].bytes.clone()], "abc");
+		assert_eq!(index.0[1].bytes, 4..7);
+		assert_eq!(&src[index.0[1].bytes.clone()], "def");
+		assert_eq!(index.0[2].bytes, 8..11);
+		assert_eq!(&src[index.0[2].bytes.clone()], "ghi");
 	}
 
 	#[test]
@@ -121,14 +137,14 @@ mod tests {
 		//          0123 4567 8901
 		let index = LineIndex::init_lf(src, false);
 
-		assert_eq!(index.0[0], 0..0);
-		assert_eq!(&src[index.0[0].clone()], "");
-		assert_eq!(index.0[1], 1..4);
-		assert_eq!(&src[index.0[1].clone()], "abc");
-		assert_eq!(index.0[2], 5..8);
-		assert_eq!(&src[index.0[2].clone()], "def");
-		assert_eq!(index.0[3], 9..12);
-		assert_eq!(&src[index.0[3].clone()], "ghi");
+		assert_eq!(index.0[0].bytes, 0..0);
+		assert_eq!(&src[index.0[0].bytes.clone()], "");
+		assert_eq!(index.0[1].bytes, 1..4);
+		assert_eq!(&src[index.0[1].bytes.clone()], "abc");
+		assert_eq!(index.0[2].bytes, 5..8);
+		assert_eq!(&src[index.0[2].bytes.clone()], "def");
+		assert_eq!(index.0[3].bytes, 9..12);
+		assert_eq!(&src[index.0[3].bytes.clone()], "ghi");
 	}
 
 	#[test]
@@ -137,14 +153,14 @@ mod tests {
 		//         012 3456 7890 1
 		let index = LineIndex::init_lf(src, false);
 
-		assert_eq!(index.0[0], 0..3);
-		assert_eq!(&src[index.0[0].clone()], "abc");
-		assert_eq!(index.0[1], 4..7);
-		assert_eq!(&src[index.0[1].clone()], "def");
-		assert_eq!(index.0[2], 8..11);
-		assert_eq!(&src[index.0[2].clone()], "ghi");
-		assert_eq!(index.0[3], 12..12);
-		assert_eq!(&src[index.0[3].clone()], "");
+		assert_eq!(index.0[0].bytes, 0..3);
+		assert_eq!(&src[index.0[0].bytes.clone()], "abc");
+		assert_eq!(index.0[1].bytes, 4..7);
+		assert_eq!(&src[index.0[1].bytes.clone()], "def");
+		assert_eq!(index.0[2].bytes, 8..11);
+		assert_eq!(&src[index.0[2].bytes.clone()], "ghi");
+		assert_eq!(index.0[3].bytes, 12..12);
+		assert_eq!(&src[index.0[3].bytes.clone()], "");
 	}
 
 	#[test]
@@ -153,12 +169,12 @@ mod tests {
 		//         012345678901234
 		let index = LineIndex::init(src, "===", false);
 
-		assert_eq!(index.0[0], 0..3);
-		assert_eq!(&src[index.0[0].clone()], "abc");
-		assert_eq!(index.0[1], 6..9);
-		assert_eq!(&src[index.0[1].clone()], "def");
-		assert_eq!(index.0[2], 12..15);
-		assert_eq!(&src[index.0[2].clone()], "ghi");
+		assert_eq!(index.0[0].bytes, 0..3);
+		assert_eq!(&src[index.0[0].bytes.clone()], "abc");
+		assert_eq!(index.0[1].bytes, 6..9);
+		assert_eq!(&src[index.0[1].bytes.clone()], "def");
+		assert_eq!(index.0[2].bytes, 12..15);
+		assert_eq!(&src[index.0[2].bytes.clone()], "ghi");
 	}
 
 	#[test]
@@ -207,15 +223,16 @@ mod tests {
 		//         01234 56789 ０１２３４
 		let index = LineIndex::init_lf(src, false);
 
-		assert_eq!(index.resolve_span(0..0), 0..3);
-		assert_eq!(index.resolve_span(1..2), 0..3);
-		assert_eq!(index.resolve_span(0..3), 0..3);
-		assert_eq!(index.resolve_span(0..4), 0..8);
-		assert_eq!(index.resolve_span(3..4), 0..8);
-		assert_eq!(index.resolve_span(0..5), 0..8);
-		assert_eq!(index.resolve_span(4..5), 4..8);
-		assert_eq!(index.resolve_span(4..8), 4..8);
-		assert_eq!(index.resolve_span(10..12), 9..12);
+		assert_eq!(index.resolve_span(0..0), 0..9);
+		assert_eq!(index.resolve_span(1..2), 0..9);
+		assert_eq!(index.resolve_span(0..3), 0..9);
+		assert_eq!(index.resolve_span(0..4), 0..22);
+		assert_eq!(index.resolve_span(3..4), 0..22);
+		assert_eq!(index.resolve_span(0..5), 0..22);
+		assert_eq!(index.resolve_span(4..5), 10..22);
+		assert_eq!(index.resolve_span(4..8), 10..22);
+		assert_eq!(index.resolve_span(2..11), 0..32);
+		assert_eq!(index.resolve_span(10..12), 23..32);
 	}
 
 	#[test]
@@ -233,6 +250,7 @@ mod tests {
 		assert_eq!(index.resolve_span(12..15), 10..22);
 		assert_eq!(index.resolve_span(12..24), 10..32);
 		assert_eq!(index.resolve_span(29..32), 23..32);
+		assert_eq!(index.resolve_span(6..29), 0..32);
 		assert_eq!(index.resolve_span(30..32), 23..32);
 	}
 }
