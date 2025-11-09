@@ -59,29 +59,29 @@ impl<'a, T> Highlighter<'a, T>
 where
 	T: ToTokenName,
 {
-	pub fn new(source: &'a str, line_feed: &str, tab_width: usize) -> Self {
+	pub fn new(source: &'a str, line_feed: &str, is_bytes: bool, tab_width: usize) -> Self {
 		Self {
 			source,
-			line_index: LineIndex::init(source, line_feed, false),
+			line_index: LineIndex::init(source, line_feed, is_bytes),
 			tab_width,
 			table: vec![],
 		}
 	}
 
-	pub fn new_lf(source: &'a str) -> Self {
+	pub fn new_lf(source: &'a str, is_bytes: bool, tab_width: usize) -> Self {
 		Self {
 			source,
-			line_index: LineIndex::init_lf(source, false),
-			tab_width: 4,
+			line_index: LineIndex::init_lf(source, is_bytes),
+			tab_width,
 			table: vec![],
 		}
 	}
 
-	pub fn new_crlf(source: &'a str) -> Self {
+	pub fn new_crlf(source: &'a str, is_bytes: bool, tab_width: usize) -> Self {
 		Self {
 			source,
-			line_index: LineIndex::init_crlf(source, false),
-			tab_width: 4,
+			line_index: LineIndex::init_crlf(source, is_bytes),
+			tab_width,
 			table: vec![],
 		}
 	}
