@@ -29,8 +29,13 @@
 
         devShells.default = mkShell {
           packages = [
+            rustc
             cargo
+            rustfmt
+            rust-analyzer
           ];
+
+          env.RUST_SRC_PATH = "${rustPlatform.rustLibSrc}";
         };
       }
     );
