@@ -53,6 +53,7 @@ where
 	line_index: LineIndex,
 	tab_width: usize,
 	table: Vec<HighlightTable<T>>,
+	is_bytes: bool,
 }
 
 impl<'a, T> Highlighter<'a, T>
@@ -65,6 +66,7 @@ where
 			line_index: LineIndex::init(source, line_feed, is_bytes),
 			tab_width,
 			table: vec![],
+			is_bytes,
 		}
 	}
 
@@ -74,6 +76,7 @@ where
 			line_index: LineIndex::init_lf(source, is_bytes),
 			tab_width,
 			table: vec![],
+			is_bytes,
 		}
 	}
 
@@ -83,6 +86,7 @@ where
 			line_index: LineIndex::init_crlf(source, is_bytes),
 			tab_width,
 			table: vec![],
+			is_bytes,
 		}
 	}
 
@@ -90,23 +94,41 @@ where
 	where
 		S: SpanLike,
 	{
-		let (start, end) = (span.start(), span.end());
-		let lines = self.line_index.resolve_span(span);
+		let (start_index, end_index) = (span.start(), span.end());
+		let (start_boundary, end_boundary) = self.line_index.resolve_boundary(span);
+
+		let (start_byte, end_byte) = if self.is_bytes {
+			(start_index, end_index)
+		} else {
+			let a = (&self.source[start_boundary.bytes.start..])
+				.char_indices()
+				.nth(start_index - start_boundary.indics.start)
+				.map(|(a, _)| a + start_boundary.bytes.start)
+				.unwrap();
+
+			let b = (&self.source[a..])
+				.char_indices()
+				.nth(end_index - start_index)
+				.map(|(b, _)| b + a)
+				.unwrap();
+
+			(a, b)
+		};
 
 		self.table.push(HighlightTable {
 			token: ToTokenNameWrapper(token),
-			range: RangeWrapper(start..end),
+			range: RangeWrapper(start_index..end_index),
 			span: format!(
 				"{}{}{}",
-				&self.source[lines.start..start]
+				&self.source[start_boundary.bytes.start..start_byte]
 					.replace("\t", &" ".repeat(self.tab_width))
 					.replace("\n", "⏎\n"),
-				(&self.source[start..end])
+				(&self.source[start_byte..end_byte])
 					.replace("\t", &" ".repeat(self.tab_width))
 					.replace("\n", "⏎\n")
 					.fg::<White>()
 					.bg_rgb::<0x17, 0x45, 0x25>(),
-				&self.source[end..lines.end]
+				&self.source[end_byte..end_boundary.bytes.end]
 					.replace("\t", &" ".repeat(self.tab_width))
 					.replace("\n", "⏎\n"),
 			),
