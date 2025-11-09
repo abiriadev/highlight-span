@@ -19,7 +19,8 @@ pub trait ToTokenName {
 struct ToTokenNameWrapper<T>(T);
 
 impl<T> Display for ToTokenNameWrapper<T>
-where T: ToTokenName
+where
+	T: ToTokenName,
 {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "{}", self.0.to_token_name())
@@ -36,14 +37,18 @@ impl Display for RangeWrapper {
 
 #[derive(Tabled)]
 struct HighlightTable<T>
-where T: ToTokenName {
+where
+	T: ToTokenName,
+{
 	token: ToTokenNameWrapper<T>,
 	range: RangeWrapper,
 	span: String,
 }
 
 pub struct Highlighter<'a, T>
-where T: ToTokenName {
+where
+	T: ToTokenName,
+{
 	source: &'a str,
 	line_index: LineIndex,
 	tab_width: usize,
@@ -51,12 +56,13 @@ where T: ToTokenName {
 }
 
 impl<'a, T> Highlighter<'a, T>
-where T: ToTokenName
+where
+	T: ToTokenName,
 {
 	pub fn new(source: &'a str, line_feed: &str, tab_width: usize) -> Self {
 		Self {
 			source,
-			line_index: LineIndex::init(source, line_feed),
+			line_index: LineIndex::init(source, line_feed, false),
 			tab_width,
 			table: vec![],
 		}
@@ -65,7 +71,7 @@ where T: ToTokenName
 	pub fn new_lf(source: &'a str) -> Self {
 		Self {
 			source,
-			line_index: LineIndex::init_lf(source),
+			line_index: LineIndex::init_lf(source, false),
 			tab_width: 4,
 			table: vec![],
 		}
@@ -74,14 +80,16 @@ where T: ToTokenName
 	pub fn new_crlf(source: &'a str) -> Self {
 		Self {
 			source,
-			line_index: LineIndex::init_crlf(source),
+			line_index: LineIndex::init_crlf(source, false),
 			tab_width: 4,
 			table: vec![],
 		}
 	}
 
 	pub fn next_token<S>(&mut self, token: T, span: S)
-	where S: SpanLike {
+	where
+		S: SpanLike,
+	{
 		let (start, end) = (span.start(), span.end());
 		let lines = self.line_index.resolve_span(span);
 
@@ -106,9 +114,7 @@ where T: ToTokenName
 	}
 
 	pub fn into_table(self) -> String {
-		Table::new(self.table)
-			.with(Style::sharp())
-			.to_string()
+		Table::new(self.table).with(Style::sharp()).to_string()
 	}
 
 	pub fn print_table(self) {
