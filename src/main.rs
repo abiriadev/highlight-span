@@ -1,6 +1,33 @@
-use std::{env::args, fs::read_to_string, io::stdin};
+use clap::Parser;
+use std::{fs::read_to_string, io::stdin, path::PathBuf};
 
 use highlight_span::{Highlighter, ToTokenName};
+
+/// Highlights text spans in source code.
+///
+/// If a file path is provided, reads source from the file.
+/// Otherwise, reads from stdin until a delimiter line (10 or more '=' characters) is encountered.
+///
+/// After loading the source, reads spans from stdin, one per line.
+/// Each span should be in the format:
+///
+///     <start> <end> <token_name>
+///
+/// where start and end are indices, and token_name is optional.
+#[derive(Parser, Debug)]
+#[command(name = "highlight-span", author, version, about, verbatim_doc_comment)]
+struct Opt {
+	/// Interpret span input as byte offsets instead of character indices
+	#[arg(long, short)]
+	bytes: bool,
+
+	/// Tab size to be used when rendering source.
+	#[arg(long, short, default_value_t = 4)]
+	tab_width: usize,
+
+	/// File path to the source file to process
+	source_path: Option<PathBuf>,
+}
 
 struct TokenDesc(String);
 
@@ -15,9 +42,11 @@ fn is_delimiter(line: &str) -> bool {
 }
 
 fn main() {
+	let opt = Opt::parse();
+
 	let mut source = String::new();
 
-	match args().nth(1) {
+	match opt.source_path {
 		// read source from provided file.
 		Some(filepath) => source = read_to_string(filepath).unwrap(),
 		_ => {
@@ -45,7 +74,7 @@ fn main() {
 		(a, b, c)
 	});
 
-	let mut hl = Highlighter::new(&source, "\n", 4);
+	let mut hl = Highlighter::new(&source, "\n", opt.bytes, opt.tab_width);
 
 	for (a, b, c) in spans {
 		hl.next_token(c, a..b);
